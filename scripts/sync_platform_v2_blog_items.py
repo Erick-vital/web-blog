@@ -134,6 +134,7 @@ def main() -> None:
     ap.add_argument('--out-dir', default=str(DEFAULT_OUT_DIR))
     ap.add_argument('--stage-allow', default=DEFAULT_STAGE_ALLOW, help='Comma-separated allowed stages (default: draft,ready)')
     ap.add_argument('--limit', type=int, default=0, help='Optional max items to export (0 = no limit)')
+    ap.add_argument('--item-id', default='', help='Optional specific platform_v2 item id to export (e.g. ci_v1_blog_xxx)')
     args = ap.parse_args()
 
     items_dir = Path(args.items_dir)
@@ -148,7 +149,10 @@ def main() -> None:
     found = 0
     exported = 0
 
-    files = sorted(items_dir.glob('ci_v1_blog_*.json'))
+    if args.item_id:
+        files = [items_dir / f"{args.item_id}.json"]
+    else:
+        files = sorted(items_dir.glob('ci_v1_blog_*.json'))
     for fp in files:
         data = load_item(fp)
         if not data:

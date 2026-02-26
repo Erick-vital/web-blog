@@ -3,7 +3,7 @@ title: "Idea 1: agents_autonomy con evidencia multi-fuente"
 description: "El 'AI Scare Trade': Cómo Identificar el Mispricing del Mercado y Convertirse en un Traductor de Dominio En el actual panorama tecnológico, estamos presenciando un fenómeno que lo…"
 pubDate: "2026-02-25T05:37:00.985744Z"
 canonical_id: "ci_v1_blog_ae377995310d"
-stage: "draft"
+stage: "ready"
 topic: "product_growth"
 use_case: "content_strategy"
 sources:
