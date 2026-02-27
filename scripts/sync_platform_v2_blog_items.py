@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, UTC
 from pathlib import Path
@@ -24,6 +25,7 @@ class BlogItem:
     topic: str
     use_case: str
     sources: list[str]
+    image_path: str
 
 
 def slugify(text: str) -> str:
@@ -32,12 +34,6 @@ def slugify(text: str) -> str:
     s = re.sub(r'\s+', '-', s)
     s = re.sub(r'-{2,}', '-', s).strip('-')
     return s[:120] or 'post'
-
-
-def parse_iso(value: str | None) -> datetime:
-    if not value:
-        return datetime(1970, 1, 1, tzinfo=UTC)
-    return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(UTC)
 
 
 def build_summary(markdown: str, max_len: int = 180) -> str:
@@ -81,6 +77,8 @@ def to_blog_item(data: dict[str, Any], allow_stages: set[str]) -> BlogItem | Non
     use_case = str(((enrich.get('use_case') or {}).get('primary')) or '')
     sources = [str(x) for x in ((lineage.get('derived_from_item_ids') or []) if isinstance(lineage.get('derived_from_item_ids'), list) else [])]
 
+    image_path = str((((artifacts.get('image') or {}).get('path')) or '')).strip()
+
     if not item_id or not title or not markdown:
         return None
 
@@ -93,23 +91,45 @@ def to_blog_item(data: dict[str, Any], allow_stages: set[str]) -> BlogItem | Non
         topic=topic,
         use_case=use_case,
         sources=sources,
+        image_path=image_path,
     )
 
 
-def render_markdown(item: BlogItem) -> str:
+def copy_hero_image(item: BlogItem, out_dir: Path) -> str | None:
+    if not item.image_path:
+        return None
+    src = Path(item.image_path)
+    if not src.exists() or not src.is_file():
+        return None
+
+    assets_dir = out_dir / 'assets'
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    ext = src.suffix.lower() or '.png'
+    fname = f"{slugify(item.title)}-{item.item_id[-6:]}{ext}"
+    dst = assets_dir / fname
+    shutil.copy2(src, dst)
+    # relative from generated/*.md -> generated/assets/*
+    return f'./assets/{fname}'
+
+
+def render_markdown(item: BlogItem, hero_image_rel: str | None = None) -> tuple[str, str]:
     slug = f"{slugify(item.title)}-{item.item_id[-6:]}"
     summary = build_summary(item.markdown)
 
-    fm = {
+    fm: dict[str, Any] = {
         'title': item.title,
         'description': summary,
         'pubDate': item.created_at or datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
+    }
+    if hero_image_rel:
+        fm['heroImage'] = hero_image_rel
+    fm.update({
         'canonical_id': item.item_id,
         'stage': item.stage,
         'topic': item.topic,
         'use_case': item.use_case,
         'sources': item.sources,
-    }
+    })
 
     lines = ['---']
     for k, v in fm.items():
@@ -149,10 +169,7 @@ def main() -> None:
     found = 0
     exported = 0
 
-    if args.item_id:
-        files = [items_dir / f"{args.item_id}.json"]
-    else:
-        files = sorted(items_dir.glob('ci_v1_blog_*.json'))
+    files = [items_dir / f"{args.item_id}.json"] if args.item_id else sorted(items_dir.glob('ci_v1_blog_*.json'))
     for fp in files:
         data = load_item(fp)
         if not data:
@@ -162,7 +179,8 @@ def main() -> None:
             continue
         found += 1
 
-        slug, body = render_markdown(item)
+        hero_rel = copy_hero_image(item, out_dir)
+        slug, body = render_markdown(item, hero_image_rel=hero_rel)
         target = out_dir / f'{slug}.md'
         target.write_text(body, encoding='utf-8')
         exported += 1
