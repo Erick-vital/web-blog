@@ -119,7 +119,8 @@ def render_markdown(item: BlogItem, hero_image_rel: str | None = None) -> tuple[
     fm: dict[str, Any] = {
         'title': item.title,
         'description': summary,
-        'pubDate': item.created_at or datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
+        # Use publication time for web visibility/order; creation timestamp lives in canonical item.
+        'pubDate': datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
     }
     if hero_image_rel:
         fm['heroImage'] = hero_image_rel
